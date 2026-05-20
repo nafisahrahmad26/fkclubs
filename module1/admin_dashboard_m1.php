@@ -1,10 +1,17 @@
 <?php
 include('../config/db.config.php');
-if ($_SESSION['user_type'] != 'Admin') { header("Location: login.php"); exit(); }
 
-$total_students = $conn->query("SELECT COUNT(*) as count FROM USER WHERE user_type='Student'")->fetch_assoc()['count'];
-$active_clubs = $conn->query("SELECT COUNT(*) as count FROM CLUB WHERE status='Active'")->fetch_assoc()['count'];
-$upcoming_events = $conn->query("SELECT COUNT(*) as count FROM EVENT WHERE event_date >= CURDATE()")->fetch_assoc()['count'];
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 'Admin') {
+    header("Location: login.php");
+    exit();
+}
+
+$res_users = mysqli_query($link, "SELECT COUNT(*) as count FROM USER");
+$total_users = mysqli_fetch_assoc($res_users)['count'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
