@@ -1,57 +1,69 @@
 <?php
-require_once('../includes/header.php');
-$my_user_id = $_SESSION['user_id'];
+require_once __DIR__ . '/config.db.php';
+if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
-if (isset($_GET['register'])) {
-    $ev_id = intval($_GET['register']);
+$user_id = $_SESSION['user_id'];
+$status_feedback = '';
+
+if (isset($_GET['request_ingress_id'])) {
+    $event_id = intval($_GET['request_ingress_id']);
+
+    // Registration validation and capacity control bounds checking
+    $count_q = mysqli_query($link, "SELECT COUNT(*) as registered_count FROM event_registration WHERE event_id = $event_id AND status='Registered'");
+    $current_registrations = mysqli_fetch_assoc($count_q)['registered_count'];
+
+    $cap_q = mysqli_query($link, "SELECT max_participants FROM event WHERE event_id = $event_id");
+    $max_capacity = mysqli_fetch_assoc($cap_q)['max_participants'];
+
+    // Prevent duplicate entries for the same active user session
+    $dup_check = mysqli_query($link, "SELECT * FROM event_registration WHERE event_id = $event_id AND user_id = $user_id");
     
-    // Capacity Verification Engine Guard
-    $capacity_check = mysqli_fetch_assoc(mysqli_query($link, "SELECT max_participants, (SELECT COUNT(*) FROM event_registration WHERE event_id=$ev_id AND status='Registered') as current_count FROM event WHERE event_id=$ev_id"));
-    
-    if ($capacity_check['current_count'] >= $capacity_check['max_participants']) {
-        echo "<script>alert('Notice: Event Registration Capacity Filled up. Added to Waiting List.');</script>";
-        mysqli_query($link, "INSERT INTO event_registration (event_id, user_id, status) VALUES ($ev_id, $my_user_id, 'Waiting List')");
+    if (mysqli_num_rows($dup_check) > 0) {
+        $status_feedback = "<div class='alert alert-danger'>Transaction Rejected: You are already logged in this active pipeline.</div>";
     } else {
-        mysqli_query($link, "INSERT INTO event_registration (event_id, user_id, status) VALUES ($ev_id, $my_user_id, 'Registered')");
+        if ($current_registrations < $max_capacity) {
+            $insert_query = "INSERT INTO event_registration (event_id, user_id, registration_date, status) VALUES ($event_id, $user_id, NOW(), 'Registered')";
+            mysqli_query($link, $insert_query);
+            $status_feedback = "<div class='alert alert-success'>Seat allocation secured! Registration verified.</div>";
+        } else {
+            // Automatic fallback to system routing parameter logic (Waiting List)
+            $insert_query = "INSERT INTO event_registration (event_id, user_id, registration_date, status) VALUES ($event_id, $user_id, NOW(), 'Waiting List')";
+            mysqli_query($link, $insert_query);
+            $status_feedback = "<div class='alert alert-danger'>Event fully booked. You have been placed on the system waiting list.</div>";
+        }
     }
 }
+
+$all_events = mysqli_query($link, "SELECT e.*, c.club_name FROM event e JOIN club c ON e.club_id = c.club_id");
 ?>
+<?php require_once __DIR__ . '/header.php'; require_once __DIR__ . '/sidebar.php'; ?>
 
-<h2>📅 Active Event Programs & Registration Terminal</h2>
-<div class="ui-card">
-    <h3>Upcoming Open Interactive Gatherings</h3>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Event Name</th>
-                <th>Execution Date/Time</th>
-                <th>Infrastructure Venue</th>
-                <th>Occupancy Load</th>
-                <th>Action Terminal</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php
-            $evt_query = mysqli_query($link, "SELECT e.*, (SELECT COUNT(*) FROM event_registration er WHERE er.event_id=e.event_id AND status='Registered') as filled FROM event e WHERE event_date >= CURDATE()");
-            while($ev = mysqli_fetch_assoc($evt_query)) {
-                $already_reg = mysqli_num_rows(mysqli_query($link, "SELECT * FROM event_registration WHERE event_id={$ev['event_id']} AND user_id=$my_user_id"));
-                
-                echo "<tr>
-                        <td><strong>{$ev['event_name']}</strong></td>
-                        <td>{$ev['event_date']} at {$ev['event_time']}</td>
-                        <td>{$ev['venue']}</td>
-                        <td>{$ev['filled']} / {$ev['max_participants']} Slots</td>
-                        <td>";
-                if ($already_reg > 0) {
-                    echo "<span style='color:#2ecc71; font-weight:bold;'>Signed Up</span>";
-                } else {
-                    echo "<a href='event_registration.php?register={$ev['event_id']}' class='btn btn-success' style='padding:5px 10px; font-size:12px; text-decoration:none;'>Join Activity</a>";
-                }
-                echo "</td></tr>";
-            }
-            ?>
-        </tbody>
-    </table>
-</div>
+<h2>Campus Student Intake Portal</h2>
+<hr style="margin:15px 0; border:0; border-top:1px solid #e2e8f0;">
+<?php echo $status_feedback; ?>
 
-<?php include('../includes/footer.php'); ?>
+<h3>Open Engagement Pipelines</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Event Name Title</th>
+            <th>Affiliated Organizing Body</th>
+            <th>Execution Timeline</th>
+            <th>Target Location Parameter</th>
+            <th>System Command Ingress</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php while($row = mysqli_fetch_assoc($all_events)): ?>
+        <tr>
+            <td><strong><?php echo htmlspecialchars($row['event_name']); ?></strong><br><span style="font-size:12px;color:#64748b;"><?php echo htmlspecialchars($row['event_description']); ?></span></td>
+            <td><?php echo htmlspecialchars($row['club_name']); ?></td>
+            <td><?php echo $row['event_date']; ?></td>
+            <td><?php echo htmlspecialchars($row['venue']); ?></td>
+            <td><a href="event_registration.php?request_ingress_id=<?php echo $row['event_id']; ?>" class="btn btn-success btn-sm">Request Seat Ingress</a></td>
+        </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
+
+<?php require_once __DIR__ . '/footer.php'; ?>

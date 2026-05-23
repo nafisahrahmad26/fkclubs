@@ -1,27 +1,27 @@
 <?php
-$user_type = $_SESSION['user_type'] ?? 'Student';
+$user_type = $_SESSION['user_type'] ?? '';
 ?>
-<div class="sidebar-panel">
-    <div class="branding-container">
-        <div class="logo-row-flex">
-            <img src="../images/umpsa_logo.png" alt="UMPSA Logo">
-            <img src="../images/logo_fk_dummy.png" alt="FKSC&EMS Logo">
-        </div>
-        <div class="system-title-label">FKSC & EMS PORTAL</div>
-    </div>
-
-    <ul class="navigation-menu-list">
-        <?php if ($user_type === 'Admin'): ?>
-            <li><a href="../module1/admin_dashboard.php">🧭 Dashboard</a></li>
-            <li><a href="../module1/user_management.php">👥 Users</a></li>
-        <?php endif; ?>
-        
-        <li><a href="../module2/club_list.php">🏛️ Clubs</a></li>
-        <li><a href="../module3/event_registration.php">📅 Reports</a></li>
-        <li><a href="../module1/profile.php">⚙️ Settings</a></li>
-        
-        <li style="margin-top: 20px;">
-            <a href="../module1/logout.php" style="color: #e74c3c;">🚪 Logout</a>
-        </li>
-    </ul>
-</div>
+<aside class="sidebar">
+    <nav class="nav-menu">
+        <ul>
+            <li><a href="admin_dashboard.php">📊 Analytics Dashboard</a></li>
+            <li><a href="profile.php">👤 Personal Profile Settings</a></li>
+            
+            <?php if ($user_type === 'Admin'): ?>
+                <li class="menu-divider">System Control Panels</li>
+                <li><a href="user_management.php">👥 Manage Membership / Users</a></li>
+                <li><a href="club_management.php">🏢 Manage Student Clubs</a></li>
+            <?php endif; ?>
+            
+            <li class="menu-divider">Core Activities Channels</li>
+            <li><a href="club_list.php">📋 Faculty Clubs Directory</a></li>
+            <li><a href="event_management.php">📅 Club Event Operations</a></li>
+            <li><a href="event_registration.php">🎟️ Event Intake Portal</a></li>
+            <li><a href="attendance.php">⏱️ Log Attendance Matrix</a></li>
+            <li><a href="participant_reports.php">📈 Performance Tiers Reports</a></li>
+            
+            <li class="logout-item"><a href="logout.php">🚪 Terminate Session (Sign Out)</a></li>
+        </ul>
+    </nav>
+</aside>
+<main class="content-body">

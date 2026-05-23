@@ -1,57 +1,69 @@
-<?php require_once('../includes/header.php'); ?>
+<?php
+require_once __DIR__ . '/config.db.php';
+if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
-<h2>📈 Activity Participation Performance & Engagement Rankings</h2>
-<p style="color:#7f8c8d; margin-bottom:20px;">Real-time evaluation data processing according to systemic Point-Based Evaluation Framework criteria.</p>
+// Dynamic Multi-Table Relational SQL JOIN Query grouping points across transaction entries
+$report_query = "
+    SELECT 
+        u.user_id,
+        u.name as student_fullname,
+        u.email as tracking_email,
+        IFNULL(SUM(a.points_earned), 0) as aggregated_score
+    FROM user u
+    LEFT JOIN attendance a ON u.user_id = a.user_id
+    WHERE u.user_type = 'Student'
+    GROUP BY u.user_id, u.name, u.email
+    ORDER BY aggregated_score DESC";
 
-<div class="ui-card">
-    <h3>Systemic Engagement Leaderboard</h3>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Student Candidate Name</th>
-                <th>Accumulated Merit Score Points</th>
-                <th>System Recognition Certification Level</th>
-                <th>Enforcement Status/Action Mapping</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php
-            $rank_query = "SELECT u.name, u.username, COALESCE(SUM(a.points_earned), 0) as total_points 
-                           FROM user u 
-                           LEFT JOIN attendance a ON u.user_id=a.user_id 
-                           WHERE u.user_type='Student' 
-                           GROUP BY u.user_id 
-                           ORDER BY total_points DESC";
+$report_res = mysqli_query($link, $report_query);
+?>
+<?php require_once __DIR__ . '/header.php'; require_once __DIR__ . '/sidebar.php'; ?>
+
+<h2>Dynamic Engagement Performance Tiers Report</h2>
+<p style="color:#64748b; margin-bottom:20px;">Real-time execution of individual metrics evaluating compliance with Table B evaluation tiers.</p>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>UID</th>
+            <th>Evaluated Student Name</th>
+            <th>Email Pathway</th>
+            <th>Accumulated Point Metrics</th>
+            <th>Calculated Recognition Enforcement Status (Table B Matrix)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php while($row = mysqli_fetch_assoc($report_res)): 
+            $score = $row['aggregated_score'];
             
-            $res = mysqli_query($link, $rank_query);
-            while($row = mysqli_fetch_assoc($res)) {
-                $p = $row['total_points'];
-                
-                // Rule implementation for Table B valuation parsing logic
-                if ($p < 20) {
-                    $tier = "Warning Level Track";
-                    $enforce = "🔕 Warning / Reminder to participate more";
-                } elseif ($p >= 20 && $p <= 49) {
-                    $tier = "Certified Level Participant";
-                    $enforce = "📜 Eligible for participation certificate";
-                } elseif ($p >= 50 && $p <= 79) {
-                    $tier = "Highly Active Contributor";
-                    $enforce = "🏅 Eligible for active student award / bonus points";
-                } else {
-                    $tier = "Outstanding Premium Catalyst Leader";
-                    $enforce = "🏆 Outstanding participant; eligible for leadership award / priority in event registration";
-                }
-
-                echo "<tr>
-                        <td><strong>".htmlspecialchars($row['name'] ? $row['name'] : $row['username'])."</strong></td>
-                        <td><span style='font-size:16px; color:#2c3e50; font-weight:bold;'>$p pts</span></td>
-                        <td><span class='user-role' style='background-color:#9b59b6;'>$tier</span></td>
-                        <td style='font-size:13px; color:#2c3e50;'>$enforce</td>
-                      </tr>";
+            // Core Table B Point-Based Evaluation Translation Layer mapping criteria logic
+            if ($score < 20) {
+                $tier_rating = "Warning / Reminder to participate more";
+                $bg = "#fef2f2"; $fg = "#991b1b";
+            } elseif ($score >= 20 && $score <= 49) {
+                $tier_rating = "Eligible for participation certificate";
+                $bg = "#fffbeb"; $fg = "#92400e";
+            } elseif ($score >= 50 && $score <= 79) {
+                $tier_rating = "Eligible for active student award / bonus points";
+                $bg = "#eff6ff"; $fg = "#1e40af";
+            } else {
+                $tier_rating = "Outstanding participant; eligible for leadership award / priority registration";
+                $bg = "#f0fdf4"; $fg = "#166534";
             }
-            ?>
-        </tbody>
-    </table>
-</div>
+        ?>
+        <tr style="background: <?php echo $bg; ?>; color: <?php echo $fg; ?>;">
+            <td>#<?php echo $row['user_id']; ?></td>
+            <td><strong><?php echo htmlspecialchars($row['student_fullname']); ?></strong></td>
+            <td><?php echo htmlspecialchars($row['tracking_email']); ?></td>
+            <td>
+                <span style="display:inline-block; padding:4px 12px; border-radius:6px; background:#ffffff; font-weight:700; border:1px solid #cbd5e1; color:#0f172a;">
+                    <?php echo $score; ?> Points
+                </span>
+            </td>
+            <td style="font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:0.02em;"><?php echo $tier_rating; ?></td>
+        </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
 
-<?php include('../includes/footer.php'); ?>
+<?php require_once __DIR__ . '/footer.php'; ?>
