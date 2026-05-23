@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../db.config.php';
+require_once __DIR__ . '/../config/db.config.php';
 if (!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
 // Dynamic Join Table: Merges club info with staff user details
