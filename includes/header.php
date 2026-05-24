@@ -14,7 +14,7 @@
         </div>
         <div class="session-info">
             <?php if(isset($_SESSION['user_name'])): ?>
-                <span>Welcome, <strong><?= htmlspecialchars($_SESSION['user_name']); ?></strong> (<?= htmlspecialchars($_SESSION['user_type']); ?>)</span>
+                <span>Welcome, <strong><?php echo htmlspecialchars($_SESSION['user_name']); ?></strong> (<?php echo htmlspecialchars($_SESSION['user_type']); ?>)</span>
             <?php endif; ?>
         </div>
     </header>

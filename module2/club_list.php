@@ -2,33 +2,38 @@
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: ../module1/login.php"); exit; }
 
-// CRUD Insertion/Updates
+// CRUD Create & Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_type'] === 'Admin') {
     $club_name = $_POST['club_name'];
     $club_category = $_POST['club_category'];
     $club_description = $_POST['club_description'];
-    $advisor_id = $_POST['advisor_id'];
+    $advisor_id = intval($_POST['advisor_id']);
     $status = $_POST['status'];
 
     if (!empty($_POST['club_id'])) {
-        $stmt = $conn->prepare("UPDATE club SET club_name=?, club_category=?, club_description=?, advisor_id=?, status=? WHERE club_id=?");
-        $stmt->execute([$club_name, $club_category, $club_description, $advisor_id, $status, $_POST['club_id']]);
+        $club_id = intval($_POST['club_id']);
+        $stmt = mysqli_prepare($conn, "UPDATE club SET club_name=?, club_category=?, club_description=?, advisor_id=?, status=? WHERE club_id=?");
+        mysqli_stmt_bind_param($stmt, "sssiis", $club_name, $club_category, $club_description, $advisor_id, $status, $club_id);
     } else {
-        $stmt = $conn->prepare("INSERT INTO club (club_name, club_category, club_description, advisor_id, status) VALUES (?, ?, ?, ?, ?)");
+        $stmt = mysqli_prepare($conn, "INSERT INTO club (club_name, club_category, club_description, advisor_id, status) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$club_name, $club_category, $club_description, $advisor_id, $status]);
+        $stmt = mysqli_prepare($conn, "INSERT INTO club (club_name, club_category, club_description, advisor_id, status) VALUES (?, ?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "sssis", $club_name, $club_category, $club_description, $advisor_id, $status);
     }
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
     header("Location: club_list.php");
     exit;
 }
 
-// Single Table Distinct Report Requirement for Module 2
-$search = $_GET['search'] ?? '';
-$stmt = $conn->prepare("SELECT * FROM club WHERE club_name LIKE ?");
-$stmt->execute(["%$search%"]);
-$clubs = $stmt->fetchAll();
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$search_param = "%$search%";
+$stmt = mysqli_prepare($conn, "SELECT * FROM club WHERE club_name LIKE ?");
+mysqli_stmt_bind_param($stmt, "s", $search_param);
+mysqli_stmt_execute($stmt);
+$clubsResult = mysqli_stmt_get_result($stmt);
 
-// Get Staff Users for Advisor Assignment Selection drop-downs
-$advisors = $conn->query("SELECT user_id, name FROM user WHERE user_type = 'Staff'")->fetchAll();
+$advisors = mysqli_query($conn, "SELECT user_id, name FROM user WHERE user_type = 'Staff'");
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -47,24 +52,24 @@ include '../includes/sidebar.php';
         </div>
         <div class="form-row">
             <select name="advisor_id" id="club-form-advisor">
-                <?php foreach($advisors as $adv): ?>
-                    <option value="<?= $adv['user_id']; ?>"><?= htmlspecialchars($adv['name']); ?></option>
-                <?php endforeach; ?>
+                <?php while($adv = mysqli_fetch_assoc($advisors)): ?>
+                    <option value="<?php echo $adv['user_id']; ?>"><?php echo htmlspecialchars($adv['name']); ?></option>
+                <?php endwhile; ?>
             </select>
             <select name="status" id="club-form-status">
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
             </select>
         </div>
-        <textarea name="club_description" id="club-form-desc" placeholder="Club Description Structure"></textarea>
+        <textarea name="club_description" id="club-form-desc" placeholder="Club Description"></textarea>
         <button type="submit" class="btn-action">Save Club</button>
     </form>
 </div>
 <?php endif; ?>
 
 <form method="GET" action="club_list.php" class="filter-bar">
-    <input type="text" name="search" value="<?= htmlspecialchars($search); ?>" placeholder="Search Club">
-    <button type="submit">Search Club</button>
+    <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search Club">
+    <button type="submit">Search</button>
 </form>
 
 <table class="data-table">
@@ -78,20 +83,20 @@ include '../includes/sidebar.php';
         </tr>
     </thead>
     <tbody>
-        <?php $idx=1; foreach($clubs as $c): ?>
+        <?php $idx=1; while($c = mysqli_fetch_assoc($clubsResult)): ?>
         <tr>
-            <td><?= $idx++; ?></td>
-            <td><strong><?= htmlspecialchars($c['club_name']); ?></strong></td>
-            <td><?= htmlspecialchars($c['club_category']); ?></td>
-            <td><?= htmlspecialchars($c['status']); ?></td>
+            <td><?php echo $idx++; ?></td>
+            <td><strong><?php echo htmlspecialchars($c['club_name']); ?></strong></td>
+            <td><?php echo htmlspecialchars($c['club_category']); ?></td>
+            <td><?php echo htmlspecialchars($c['status']); ?></td>
             <td>
                 <?php if($_SESSION['user_type'] === 'Admin'): ?>
-                    <button class="btn-inline-edit" onclick="editClub(<?= htmlspecialchars(json_encode($c)); ?>)">Edit</button>
+                    <button class="btn-inline-edit" onclick='editClub(<?php echo json_encode($c); ?>)'>Edit</button>
                 <?php endif; ?>
-                <a href="club_management.php?id=<?= $c['club_id']; ?>" class="btn-inline-view">View details</a>
+                <a href="club_management.php?id=<?php echo $c['club_id']; ?>" class="btn-inline-view">Details</a>
             </td>
         </tr>
-        <?php endforeach; ?>
+        <?php endwhile; ?>
     </tbody>
 </table>
 
@@ -106,4 +111,7 @@ function editClub(club) {
 }
 </script>
 
-<?php include '../includes/footer.php'; ?>
+<?php 
+mysqli_stmt_close($stmt);
+include '../includes/footer.php'; 
+?>

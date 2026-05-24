@@ -2,7 +2,7 @@
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: ../module1/login.php"); exit; }
 
-// Module 4 Join Query Reporting Requirement: Multi-table aggregation mapping framework calculations
+// SQL JOIN Multi-table query: Agregasi mata dan jumlah event yang disertai pelajar
 $reportsQuery = "SELECT u.user_id, u.name as student_name, u.email,
                  COUNT(a.attendance_id) as events_attended,
                  IFNULL(SUM(a.points_earned), 0) as total_points
@@ -11,13 +11,13 @@ $reportsQuery = "SELECT u.user_id, u.name as student_name, u.email,
                  WHERE u.user_type = 'Student'
                  GROUP BY u.user_id, u.name, u.email
                  ORDER BY total_points DESC";
-$reportRows = $conn->query($reportsQuery)->fetchAll();
+$reportRows = mysqli_query($conn, $reportsQuery);
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 
-<h2>Figure 4.3 Reports Page (Admin / Faculty View)</h2>
+<h2>Reports Page (Admin / Faculty View)</h2>
 <h3>Extracurricular Point-Based Recognition Level Audit System</h3>
 
 <table class="data-table">
@@ -28,13 +28,14 @@ include '../includes/sidebar.php';
             <th>Email</th>
             <th>Events Tracked</th>
             <th>Accumulated Points</th>
-            <th>Table B Recognition Tier Enforcement Output</th>
+            <th>Table B Recognition Tier Output</th>
         </tr>
     </thead>
     <tbody>
-        <?php foreach($reportRows as $row): 
+        <?php while($row = mysqli_fetch_assoc($reportRows)): 
             $pts = $row['total_points'];
-            // Table B Point Evaluation Condition Engine
+            
+            // Engine Penilaian Automatik berdasarkan Table B Requirement
             if ($pts < 20) {
                 $tier = "<span class='badge-role' style='background:#dc3545;'>Warning / Low Participation</span>";
             } elseif ($pts >= 20 && $pts <= 49) {
@@ -46,14 +47,14 @@ include '../includes/sidebar.php';
             }
         ?>
         <tr>
-            <td>FK-STU-0<?= $row['user_id']; ?></td>
-            <td><strong><?= htmlspecialchars($row['student_name']); ?></strong></td>
-            <td><?= htmlspecialchars($row['email']); ?></td>
-            <td><?= $row['events_attended']; ?></td>
-            <td><span style="font-weight:bold; color:#0056b3;"><?= $pts; ?> pts</span></td>
-            <td><?= $tier; ?></td>
+            <td>FK-STU-0<?php echo $row['user_id']; ?></td>
+            <td><strong><?php echo htmlspecialchars($row['student_name']); ?></strong></td>
+            <td><?php echo htmlspecialchars($row['email']); ?></td>
+            <td><?php echo $row['events_attended']; ?></td>
+            <td><span style="font-weight:bold; color:#0056b3;"><?php echo $pts; ?> pts</span></td>
+            <td><?php echo $tier; ?></td>
         </tr>
-        <?php endforeach; ?>
+        <?php endwhile; ?>
     </tbody>
 </table>
 

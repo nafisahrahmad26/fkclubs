@@ -2,17 +2,31 @@
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
 
-// Fetch KPIs
-$totalUsers = $conn->query("SELECT COUNT(*) FROM user")->fetchColumn();
-$totalStudents = $conn->query("SELECT COUNT(*) FROM user WHERE user_type = 'Student'")->fetchColumn();
-$totalCommittees = $conn->query("SELECT COUNT(*) FROM membership WHERE club_role != 'General Member'")->fetchColumn();
-$totalClubs = $conn->query("SELECT COUNT(*) FROM club WHERE status = 'Active'")->fetchColumn();
+// Kira Total Users
+$res1 = mysqli_query($conn, "SELECT COUNT(*) as total FROM user");
+$row1 = mysqli_fetch_assoc($res1);
+$totalUsers = $row1['total'];
 
-// Join Table Report Requirement (Distinct to Module 1): Get Recent Users with Roles
-$recentUsersQuery = "SELECT u.user_id, u.name, u.email, u.user_type, u.status 
-                     FROM user u 
-                     ORDER BY u.user_id DESC LIMIT 3";
-$recentUsers = $conn->query($recentUsersQuery)->fetchAll();
+// Kira Total Students
+$res2 = mysqli_query($conn, "SELECT COUNT(*) as total FROM user WHERE user_type = 'Student'");
+$row2 = mysqli_fetch_assoc($res2);
+$totalStudents = $row2['total'];
+
+// Kira Total Committees
+$res3 = mysqli_query($conn, "SELECT COUNT(*) as total FROM membership WHERE club_role != 'General Member'");
+$row3 = mysqli_fetch_assoc($res3);
+$totalCommittees = $row3['total'];
+
+// Kira Total Clubs
+$res4 = mysqli_query($conn, "SELECT COUNT(*) as total FROM club WHERE status = 'Active'");
+$row4 = mysqli_fetch_assoc($res4);
+$totalClubs = $row4['total'];
+
+// Report Join Table: Papar user yang baru mendaftar
+$recentQuery = "SELECT u.user_id, u.name, u.email, u.user_type, u.status 
+                FROM user u 
+                ORDER BY u.user_id DESC LIMIT 3";
+$recentUsers = mysqli_query($conn, $recentQuery);
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -21,13 +35,13 @@ include '../includes/sidebar.php';
 <h2>Admin Dashboard</h2>
 
 <div class="kpi-container">
-    <div class="kpi-card"><h5>Total Users</h5><p><?= $totalUsers; ?></p></div>
-    <div class="kpi-card"><h5>Total Students</h5><p><?= $totalStudents; ?></p></div>
-    <div class="kpi-card"><h5>Total Committees</h5><p><?= $totalCommittees; ?></p></div>
-    <div class="kpi-card"><h5>Total Clubs</h5><p><?= $totalClubs; ?></p></div>
+    <div class="kpi-card"><h5>Total Users</h5><p><?php echo $totalUsers; ?></p></div>
+    <div class="kpi-card"><h5>Total Students</h5><p><?php echo $totalStudents; ?></p></div>
+    <div class="kpi-card"><h5>Total Committees</h5><p><?php echo $totalCommittees; ?></p></div>
+    <div class="kpi-card"><h5>Total Clubs</h5><p><?php echo $totalClubs; ?></p></div>
 </div>
 
-<h3>Recent Users</h3>
+<h3>Recent Users (Join/Single Table Audit Log)</h3>
 <table class="data-table">
     <thead>
         <tr>
@@ -39,21 +53,21 @@ include '../includes/sidebar.php';
         </tr>
     </thead>
     <tbody>
-        <?php $i=1; foreach($recentUsers as $user): ?>
+        <?php $i=1; while($user = mysqli_fetch_assoc($recentUsers)): ?>
         <tr>
-            <td><?= $i++; ?></td>
-            <td><?= htmlspecialchars($user['name']); ?></td>
-            <td><?= htmlspecialchars($user['email']); ?></td>
-            <td><?= htmlspecialchars($user['user_type']); ?></td>
-            <td><?= htmlspecialchars($user['status']); ?></td>
+            <td><?php echo $i++; ?></td>
+            <td><?php echo htmlspecialchars($user['name']); ?></td>
+            <td><?php echo htmlspecialchars($user['email']); ?></td>
+            <td><?php echo htmlspecialchars($user['user_type']); ?></td>
+            <td><?php echo htmlspecialchars($user['status']); ?></td>
         </tr>
-        <?php endforeach; ?>
+        <?php endwhile; ?>
     </tbody>
 </table>
 
 <div class="announcement-box">
     <h4>System Announcements/Notifications</h4>
-    <p>System updates: Extracurricular points system updated according to Table A enforcement schedules.</p>
+    <p>Sistem mata ganjaran kokurikulum (Extracurricular points system) telah dikemaskini mengikut ketetapan Table A.</p>
 </div>
 
 <?php include '../includes/footer.php'; ?>

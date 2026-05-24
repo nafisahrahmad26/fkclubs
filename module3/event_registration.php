@@ -2,42 +2,59 @@
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: ../module1/login.php"); exit; }
 
-$event_id = $_GET['id'] ?? 0;
+$event_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$user_id = intval($_SESSION['user_id']);
 
-// Process the registration request logic safely
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_type'] === 'Student') {
-    // 1. Double registration structural protection step
-    $chk = $conn->prepare("SELECT COUNT(*) FROM event_registration WHERE event_id = ? AND user_id = ? AND status='Registered'");
-    $chk->execute([$event_id, $_SESSION['user_id']]);
+    // Semak jika sudah mendaftar
+    $chkStmt = mysqli_prepare($conn, "SELECT COUNT(*) as count FROM event_registration WHERE event_id = ? AND user_id = ? AND status='Registered'");
+    mysqli_stmt_bind_param($chkStmt, "ii", $event_id, $user_id);
+    mysqli_stmt_execute($chkStmt);
+    $resCheck = mysqli_fetch_assoc(mysqli_stmt_get_result($chkStmt));
+    mysqli_stmt_close($chkStmt);
     
-    if ($chk->fetchColumn() == 0) {
-        // 2. Validate current booking metric ceilings values limits constraints 
-        $evDetails = $conn->prepare("SELECT max_participants FROM event WHERE event_id = ?");
-        $evDetails->execute([$event_id]);
-        $maxVal = $evDetails->fetchColumn();
+    if ($resCheck['count'] == 0) {
+        // Ambil max_participants
+        $evDetails = mysqli_prepare($conn, "SELECT max_participants FROM event WHERE event_id = ?");
+        mysqli_stmt_bind_param($evDetails, "i", $event_id);
+        mysqli_stmt_execute($evDetails);
+        $evRow = mysqli_fetch_assoc(mysqli_stmt_get_result($evDetails));
+        $maxVal = $evRow['max_participants'];
+        mysqli_stmt_close($evDetails);
 
-        $curDetails = $conn->prepare("SELECT COUNT(*) FROM event_registration WHERE event_id = ? AND status='Registered'");
-        $curDetails->execute([$event_id]);
-        $currentFilled = $curDetails->fetchColumn();
+        // Ambil bilangan yang sudah berdaftar
+        $curDetails = mysqli_prepare($conn, "SELECT COUNT(*) as total_filled FROM event_registration WHERE event_id = ? AND status='Registered'");
+        mysqli_stmt_bind_param($curDetails, "i", $event_id);
+        mysqli_stmt_execute($curDetails);
+        $curRow = mysqli_fetch_assoc(mysqli_stmt_get_result($curDetails));
+        $currentFilled = $curRow['total_filled'];
+        mysqli_stmt_close($curDetails);
 
         if ($currentFilled >= $maxVal) {
-            // Apply waiting list automation fallback condition requirement
-            $stmt = $conn->prepare("INSERT INTO event_registration (event_id, user_id, status) VALUES (?, ?, 'Waiting List')");
-            $stmt->execute([$event_id, $_SESSION['user_id']]);
+            // Jika Penuh -> Letak dalam Waiting List
+            $stmt = mysqli_prepare($conn, "INSERT INTO event_registration (event_id, user_id, status) VALUES (?, ?, 'Waiting List')");
+            mysqli_stmt_bind_param($stmt, "ii", $event_id, $user_id);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
             header("Location: event_registration.php?id=".$event_id."&msg=waiting");
             exit;
         } else {
-            $stmt = $conn->prepare("INSERT INTO event_registration (event_id, user_id, status) VALUES (?, ?, 'Registered')");
-            $stmt->execute([$event_id, $_SESSION['user_id']]);
+            // Jika Masih Kosong -> Sah Pendaftaran
+            $stmt = mysqli_prepare($conn, "INSERT INTO event_registration (event_id, user_id, status) VALUES (?, ?, 'Registered')");
+            mysqli_stmt_bind_param($stmt, "ii", $event_id, $user_id);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
             header("Location: event_registration.php?id=".$event_id."&msg=success");
             exit;
         }
     }
 }
 
-$stmt = $conn->prepare("SELECT * FROM event WHERE event_id = ?");
-$stmt->execute([$event_id]);
-$event = $stmt->fetch();
+$stmt = mysqli_prepare($conn, "SELECT * FROM event WHERE event_id = ?");
+mysqli_stmt_bind_param($stmt, "i", $event_id);
+mysqli_stmt_execute($stmt);
+$event = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+mysqli_stmt_close($stmt);
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -46,22 +63,22 @@ include '../includes/sidebar.php';
 <h2>Event Registration Details</h2>
 
 <?php if(isset($_GET['msg']) && $_GET['msg']=='success'): ?>
-    <div style="background:#d4edda; padding:10px; margin-bottom:15px; border-radius:4px;">Registration processed successfully! Your slot is secure.</div>
+    <div style="background:#d4edda; color:#155724; padding:10px; margin-bottom:15px; border-radius:4px; border:1px solid #c3e6cb;">Registration processed successfully! Slot secured.</div>
 <?php elseif(isset($_GET['msg']) && $_GET['msg']=='waiting'): ?>
-    <div style="background:#fff3cd; padding:10px; margin-bottom:15px; border-radius:4px;">Event full! You have been queued to the system Waiting List safely.</div>
+    <div style="background:#fff3cd; color:#856404; padding:10px; margin-bottom:15px; border-radius:4px; border:1px solid #ffeeba;">Event full! You have been queued to the Waiting List.</div>
 <?php endif; ?>
 
 <div class="form-container-card">
-    <h3>Event Title: <?= htmlspecialchars($event['event_name']); ?></h3>
-    <p><strong>Date:</strong> <?= $event['event_date']; ?> | <strong>Time:</strong> <?= $event['event_time']; ?></p>
-    <p><strong>Venue:</strong> <?= htmlspecialchars($event['venue']); ?></p>
-    <p><strong>Details Description:</strong> <?= htmlspecialchars($event['event_description']); ?></p>
+    <h3>Event Title: <?php echo htmlspecialchars($event['event_name']); ?></h3>
+    <p><strong>Date:</strong> <?php echo $event['event_date']; ?> | <strong>Time:</strong> <?php echo $event['event_time']; ?></p>
+    <p><strong>Venue:</strong> <?php echo htmlspecialchars($event['venue']); ?></p>
+    <p><strong>Description:</strong> <?php echo htmlspecialchars($event['event_description']); ?></p>
 
-    <form action="event_registration.php?id=<?= $event['event_id']; ?>" method="POST" onsubmit="return confirm('Confirm registration submission detail values?')">
+    <form action="event_registration.php?id=<?php echo $event['event_id']; ?>" method="POST" onsubmit="return confirm('Confirm registration submission?')">
         <?php if($_SESSION['user_type'] === 'Student'): ?>
             <button type="submit" class="btn-submit">Confirm Registration</button>
         <?php else: ?>
-            <p><em>Only active student standard accounts are permitted to perform submission bookings.</em></p>
+            <p><em>Only active student accounts are permitted to perform registration bookings.</em></p>
         <?php endif; ?>
     </form>
 </div>

@@ -13,8 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($username) && !empty($password)) {
         
-        // Menggunakan syntax MySQLi Prepared Statement
-        $stmt = mysqli_prepare($link, "SELECT * FROM user WHERE username = ? AND status = 'Active'");
+        // DI SINI TELAH DIUBAH DARIPADA $link KEPADA $conn
+        $stmt = mysqli_prepare($conn, "SELECT * FROM user WHERE username = ? AND status = 'Active'");
         
         if ($stmt) {
             // 's' bermaksud string untuk parameter username

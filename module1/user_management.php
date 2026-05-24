@@ -4,15 +4,18 @@ if(!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'Admin') {
     header("Location: login.php"); exit; 
 }
 
-// Handle Delete CRUD Operation
+// DELETE CRUD Operation
 if (isset($_GET['delete'])) {
-    $stmt = $conn->prepare("DELETE FROM user WHERE user_id = ?");
-    $stmt->execute([$_GET['delete']]);
+    $delete_id = intval($_GET['delete']);
+    $stmt = mysqli_prepare($conn, "DELETE FROM user WHERE user_id = ?");
+    mysqli_stmt_bind_param($stmt, "i", $delete_id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
     header("Location: user_management.php");
     exit;
 }
 
-// Handle Create/Update CRUD Operation
+// CREATE / UPDATE CRUD Operation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = $_POST['name'];
     $email = $_POST['email'];
@@ -22,33 +25,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'];
 
     if (!empty($_POST['user_id'])) {
-        // Update Action
-        $stmt = $conn->prepare("UPDATE user SET name=?, email=?, username=?, password=?, user_type=?, status=? WHERE user_id=?");
-        $stmt->execute([$name, $email, $username, $password, $user_type, $status, $_POST['user_id']]);
+        // UPDATE ACTION
+        $user_id = intval($_POST['user_id']);
+        $stmt = mysqli_prepare($conn, "UPDATE user SET name=?, email=?, username=?, password=?, user_type=?, status=? WHERE user_id=?");
+        mysqli_stmt_bind_param($stmt, "ssssssi", $name, $email, $username, $password, $user_type, $status, $user_id);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
     } else {
-        // Create Action
-        $stmt = $conn->prepare("INSERT INTO user (name, email, username, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $email, $username, $password, $user_type, $status]);
+        // CREATE ACTION
+        $stmt = mysqli_prepare($conn, "INSERT INTO user (name, email, username, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "ssssss", $name, $email, $username, $password, $user_type, $status);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
     }
     header("Location: user_management.php");
     exit;
 }
 
-// Handle Filter and Search
-$search = $_GET['search'] ?? '';
-$roleFilter = $_GET['role_filter'] ?? '';
+// SEARCH & FILTER
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$roleFilter = isset($_GET['role_filter']) ? $_GET['role_filter'] : '';
 
 $query = "SELECT * FROM user WHERE (name LIKE ? OR email LIKE ?)";
-$params = ["%$search%", "%$search%"];
+$search_param = "%$search%";
 
 if (!empty($roleFilter)) {
     $query .= " AND user_type = ?";
-    $params[] = $roleFilter;
+    $stmt = mysqli_prepare($conn, $query);
+    mysqli_stmt_bind_param($stmt, "sss", $search_param, $search_param, $roleFilter);
+} else {
+    $stmt = mysqli_prepare($conn, $query);
+    mysqli_stmt_bind_param($stmt, "ss", $search_param, $search_param);
 }
-$stmt = $conn->prepare($query);
-$stmt->execute($params);
-$users = $stmt->fetchAll();
 
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+?>
+
+<?php
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
@@ -70,7 +84,7 @@ include '../includes/sidebar.php';
         <div class="form-row">
             <select name="user_type" id="form-role">
                 <option value="Student">Student</option>
-                <option value="Staff">Staff (Committee/Advisor)</option>
+                <option value="Staff">Staff</option>
                 <option value="Admin">Admin</option>
             </select>
             <select name="status" id="form-status">
@@ -78,17 +92,17 @@ include '../includes/sidebar.php';
                 <option value="Inactive">Inactive</option>
             </select>
         </div>
-        <button type="submit" class="btn-action btn-save">Save User</button>
+        <button type="submit" class="btn-action">Save User</button>
     </form>
 </div>
 
 <form method="GET" action="user_management.php" class="filter-bar">
-    <input type="text" name="search" value="<?= htmlspecialchars($search); ?>" placeholder="Search User">
+    <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search User">
     <select name="role_filter">
         <option value="">Filter by Role</option>
-        <option value="Admin" <?= $roleFilter=='Admin'?'selected':''; ?>>Admin</option>
-        <option value="Student" <?= $roleFilter=='Student'?'selected':''; ?>>Student</option>
-        <option value="Staff" <?= $roleFilter=='Staff'?'selected':''; ?>>Staff</option>
+        <option value="Admin" <?php echo $roleFilter=='Admin'?'selected':''; ?>>Admin</option>
+        <option value="Student" <?php echo $roleFilter=='Student'?'selected':''; ?>>Student</option>
+        <option value="Staff" <?php echo $roleFilter=='Staff'?'selected':''; ?>>Staff</option>
     </select>
     <button type="submit">Search</button>
 </form>
@@ -105,19 +119,19 @@ include '../includes/sidebar.php';
         </tr>
     </thead>
     <tbody>
-        <?php foreach($users as $u): ?>
+        <?php while($u = mysqli_fetch_assoc($result)): ?>
         <tr>
-            <td><?= $u['user_id']; ?></td>
-            <td><?= htmlspecialchars($u['name']); ?></td>
-            <td><?= htmlspecialchars($u['email']); ?></td>
-            <td><?= htmlspecialchars($u['user_type']); ?></td>
-            <td><?= htmlspecialchars($u['status']); ?></td>
+            <td><?php echo $u['user_id']; ?></td>
+            <td><?php echo htmlspecialchars($u['name']); ?></td>
+            <td><?php echo htmlspecialchars($u['email']); ?></td>
+            <td><?php echo htmlspecialchars($u['user_type']); ?></td>
+            <td><?php echo htmlspecialchars($u['status']); ?></td>
             <td>
-                <button class="btn-inline-edit" onclick="editUser(<?= htmlspecialchars(json_encode($u)); ?>)">Edit</button>
-                <a href="user_management.php?delete=<?= $u['user_id']; ?>" class="btn-inline-delete" onclick="return confirm('Delete user record?')">Delete</a>
+                <button class="btn-inline-edit" onclick='editUser(<?php echo json_encode($u); ?>)'>Edit</button>
+                <a href="user_management.php?delete=<?php echo $u['user_id']; ?>" class="btn-inline-delete" onclick="return confirm('Delete user record?')">Delete</a>
             </td>
         </tr>
-        <?php endforeach; ?>
+        <?php endwhile; ?>
     </tbody>
 </table>
 
@@ -133,4 +147,7 @@ function editUser(user) {
 }
 </script>
 
-<?php include '../includes/footer.php'; ?>
+<?php 
+mysqli_stmt_close($stmt);
+include '../includes/footer.php'; 
+?>

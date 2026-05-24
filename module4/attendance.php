@@ -2,51 +2,60 @@
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: ../module1/login.php"); exit; }
 
-// Process attendance logging matching the system specs matrix rules
+// Simpan atau kemaskini kehadiran (Table A Automation Engine)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_type'] !== 'Student') {
-    $reg_id = $_POST['registration_id'];
+    $reg_id = intval($_POST['registration_id']);
     $status_val = $_POST['attendance_status'];
     
-    // Evaluate matrix scores criteria automatically based on Table A requirements
+    // Logik pemarkahan automatik berpandukan Table A
     $points = 0;
     if ($status_val === 'Present')   { $points = 10; }
     if ($status_val === 'Late')      { $points = 5; }
     if ($status_val === 'Absent')    { $points = -10; }
     if ($status_val === 'Volunteer') { $points = 5; }
 
-    // Identify user context mapping link
-    $lookup = $conn->prepare("SELECT user_id FROM event_registration WHERE registration_id = ?");
-    $lookup->execute([$reg_id]);
-    $u_id = $lookup->fetchColumn();
+    // Cari user_id pemilik pendaftaran tersebut
+    $lookupStmt = mysqli_prepare($conn, "SELECT user_id FROM event_registration WHERE registration_id = ?");
+    mysqli_stmt_bind_param($lookupStmt, "i", $reg_id);
+    mysqli_stmt_execute($lookupStmt);
+    $resLookup = mysqli_stmt_get_result($lookupStmt);
+    $rowLookup = mysqli_fetch_assoc($resLookup);
+    $u_id = $rowLookup['user_id'];
+    mysqli_stmt_close($lookupStmt);
 
-    // Upsert mechanism to prevent double logs
-    $checkLog = $conn->prepare("SELECT count(*) FROM attendance WHERE registration_id = ?");
-    $checkLog->execute([$reg_id]);
+    // Semak rekod sedia ada (Upsert)
+    $chkLog = mysqli_prepare($conn, "SELECT COUNT(*) as count FROM attendance WHERE registration_id = ?");
+    mysqli_stmt_bind_param($chkLog, "i", $reg_id);
+    mysqli_stmt_execute($chkLog);
+    $resChkLog = mysqli_fetch_assoc(mysqli_stmt_get_result($chkLog));
+    mysqli_stmt_close($chkLog);
     
-    if($checkLog->fetchColumn() > 0) {
-        $stmt = $conn->prepare("UPDATE attendance SET attendance_status=?, check_in_time=NOW(), points_earned=? WHERE registration_id=?");
-        $stmt->execute([$status_val, $points, $reg_id]);
+    if($resChkLog['count'] > 0) {
+        $stmt = mysqli_prepare($conn, "UPDATE attendance SET attendance_status=?, check_in_time=NOW(), points_earned=? WHERE registration_id=?");
+        mysqli_stmt_bind_param($stmt, "sii", $status_val, $points, $reg_id);
     } else {
-        $stmt = $conn->prepare("INSERT INTO attendance (registration_id, user_id, attendance_status, check_in_time, points_earned) VALUES (?, ?, ?, NOW(), ?)");
-        $stmt->execute([$reg_id, $u_id, $status_val, $points]);
+        $stmt = mysqli_prepare($conn, "INSERT INTO attendance (registration_id, user_id, attendance_status, check_in_time, points_earned) VALUES (?, ?, ?, NOW(), ?)");
+        mysqli_stmt_bind_param($stmt, "iisi", $reg_id, $u_id, $status_val, $points);
     }
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
     header("Location: attendance.php?success=1");
     exit;
 }
 
-// Complex Join query mapping across event registries structures
+// Join Table Report: Cantumkan data pendaftaran, nama event, dan nama student
 $registryQuery = "SELECT r.registration_id, r.status, e.event_name, u.name as student_name, u.user_id 
                   FROM event_registration r
                   JOIN event e ON r.event_id = e.event_id
                   JOIN user u ON r.user_id = u.user_id
                   WHERE r.status = 'Registered'";
-$registrations = $conn->query($registryQuery)->fetchAll();
+$registrationsResult = mysqli_query($conn, $registryQuery);
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 
-<h2>Figure 4.1 Record Attendance Page (Committee View)</h2>
+<h2>Record Attendance Page (Committee View)</h2>
 
 <table class="data-table">
     <thead>
@@ -57,29 +66,29 @@ include '../includes/sidebar.php';
         </tr>
     </thead>
     <tbody>
-        <?php foreach($registrations as $reg): 
-            // Look up existing session values logged
-            $curLog = $conn->prepare("SELECT attendance_status FROM attendance WHERE registration_id = ?");
-            $curLog->execute([$reg['registration_id']]);
-            $loggedStatus = $curLog->fetchColumn();
+        <?php while($reg = mysqli_fetch_assoc($registrationsResult)): 
+            $r_id = $reg['registration_id'];
+            $curLog = mysqli_query($conn, "SELECT attendance_status FROM attendance WHERE registration_id = $r_id");
+            $loggedRow = mysqli_fetch_assoc($curLog);
+            $loggedStatus = $loggedRow ? $loggedRow['attendance_status'] : '';
         ?>
         <tr>
-            <td><?= htmlspecialchars($reg['event_name']); ?></td>
-            <td><?= htmlspecialchars($reg['student_name']); ?></td>
+            <td><?php echo htmlspecialchars($reg['event_name']); ?></td>
+            <td><?php echo htmlspecialchars($reg['student_name']); ?></td>
             <td>
                 <form action="attendance.php" method="POST" style="display:inline-flex; gap:10px;">
-                    <input type="hidden" name="registration_id" value="<?= $reg['registration_id']; ?>">
+                    <input type="hidden" name="registration_id" value="<?php echo $reg['registration_id']; ?>">
                     <select name="attendance_status" required style="padding: 4px;">
-                        <option value="Present" <?= $loggedStatus=='Present'?'selected':''; ?>>Present on time (+10)</option>
-                        <option value="Late" <?= $loggedStatus=='Late'?'selected':''; ?>>Late arrival (+5)</option>
-                        <option value="Absent" <?= $loggedStatus=='Absent'?'selected':''; ?>>Absent without notice (-10)</option>
-                        <option value="Volunteer" <?= $loggedStatus=='Volunteer'?'selected':''; ?>>Volunteer Helper (+5)</option>
+                        <option value="Present" <?php echo $loggedStatus=='Present'?'selected':''; ?>>Present on time (+10)</option>
+                        <option value="Late" <?php echo $loggedStatus=='Late'?'selected':''; ?>>Late arrival (+5)</option>
+                        <option value="Absent" <?php echo $loggedStatus=='Absent'?'selected':''; ?>>Absent without notice (-10)</option>
+                        <option value="Volunteer" <?php echo $loggedStatus=='Volunteer'?'selected':''; ?>>Volunteer Helper (+5)</option>
                     </select>
-                    <button type="submit" class="btn-inline-edit" style="background:#28a745;">Save</button>
+                    <button type="submit" class="btn-inline-edit" style="background:#28a745; color: white;">Save</button>
                 </form>
             </td>
         </tr>
-        <?php endforeach; ?>
+        <?php endwhile; ?>
     </tbody>
 </table>
 
