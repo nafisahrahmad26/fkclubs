@@ -8,9 +8,10 @@ $db_user = "root";
 $db_pass = "";
 $db_name = "fkclubs";
 
-$link = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
+// TUKAR NAMA VARIABLE DARIPADA $link KEPADA $conn DI SINI:
+$conn = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 
-if (!$link) {
+if (!$conn) {
     die("Database connection failed: " . mysqli_connect_error());
 }
 ?>
