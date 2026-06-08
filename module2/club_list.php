@@ -16,8 +16,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_type'] === 'Admin')
         mysqli_stmt_bind_param($stmt, "sssiis", $club_name, $club_category, $club_description, $advisor_id, $status, $club_id);
     } else {
         $stmt = mysqli_prepare($conn, "INSERT INTO club (club_name, club_category, club_description, advisor_id, status) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$club_name, $club_category, $club_description, $advisor_id, $status]);
-        $stmt = mysqli_prepare($conn, "INSERT INTO club (club_name, club_category, club_description, advisor_id, status) VALUES (?, ?, ?, ?, ?)");
         mysqli_stmt_bind_param($stmt, "sssis", $club_name, $club_category, $club_description, $advisor_id, $status);
     }
     mysqli_stmt_execute($stmt);
@@ -48,7 +46,14 @@ include '../includes/sidebar.php';
         <input type="hidden" name="club_id" id="club-form-id">
         <div class="form-row">
             <input type="text" name="club_name" id="club-form-name" placeholder="Club Name" required>
-            <input type="text" name="club_category" id="club-form-category" placeholder="Category" required>
+            <select name="club_category" id="club-form-category" required>
+                <option value="">-- Select Category --</option>
+                <option value="Kesenian">Kesenian</option>
+                <option value="BBU">BBU</option>
+                <option value="Sukan">Sukan</option>
+                <option value="Kesukarelawanan">Kesukarelawanan</option>
+                <option value="Keusahawanan">Keusahawanan</option>
+            </select>
         </div>
         <div class="form-row">
             <select name="advisor_id" id="club-form-advisor">
