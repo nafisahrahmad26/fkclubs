@@ -1,6 +1,7 @@
 <?php
 require_once '../config/db.config.php';
 if(!isset($_SESSION['user_id'])) { header("Location: ../module1/login.php"); exit; }
+if($_SESSION['user_type'] === 'Admin') { header("Location: ../module1/admin_dashboard.php"); exit; }
 
 // Tambah Event Baru
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_SESSION['user_type'] !== 'Student') {
